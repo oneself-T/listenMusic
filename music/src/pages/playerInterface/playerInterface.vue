@@ -132,13 +132,23 @@ export default {
         }
     },
     methods: {
+        // 歌手名(多人)
+        parseName(singerList) {
+            let singerName = '';
+            for(let f=0;f<singerList.length;f++) {
+                let name = singerList[f].name + '/';
+                singerName += name;
+            }
+            singerName = singerName.substring(0,singerName.length-1);
+            return singerName;
+        },
         getSongData(songId,songList,state) {
             let id = this.songId;
             let _this = this;
             this.audio.src = '';
             // 歌词滚动元素
             let songWordsList = document.querySelector('.songWordsList');
-
+            
             // bar条
             let range = document.querySelector('.range');
             
@@ -155,18 +165,18 @@ export default {
                 return fetch(url).then(res => format ? res.text() : res.json());
             }
             // 加载所有请求           
-            request(`https://v1.itooi.cn/tencent/comment/song/hot?id=${id}&page=0&pageSize=30`,false)
+            request(`http://localhost:3000/comment/music?id=${id}&limit=1`,false)
                 // 歌曲评论
-                .then(body => {
-                    if(body.code == 200) {
+                .then(res => {
+                    if(res.code == 200) {
                         let commentList = new Array();
-                        let allData = body.data.commentlist;
+                        let allData = res.hotComments;
                         if(allData) {
                             allData.forEach((item,index) => {
-                                let commentContent = item.rootcommentcontent.replace(/\\n/g, '\n');
-                                let userPic = item.avatarurl;
-                                let userName = item.nick;
-                                let fabulous = item.praisenum;
+                                let commentContent = item.content.replace(/\\n/g, '\n');
+                                let userPic = item.user.avatarUrl;
+                                let userName = item.user.nickname;
+                                let fabulous = item.likedCount;
                                 commentList.push({
                                     commentContent,
                                     userPic,
@@ -177,61 +187,71 @@ export default {
                             this.commentList = commentList;
                         }
                     }
-                    return request(`https://v1.itooi.cn/tencent/lrc?id=${id}`);
+                    return request(`http://localhost:3000/lyric?id=${id}`,false);
                 })
                 // 歌词
-                .then(body => {
-                    let songWordsList = new Array();
-                    let part = body.split("\n");
-                    part.forEach((item,index) => {
-                        // 拆分时间:歌词
-                        let start = item.indexOf('[');
-                        let end = item.indexOf(']');
-                        let len = item.length;
-                        let cuttingFront = item.substring(start + 1, end);
-                        let cuttingAfter = item.substring(end + 1, len);
-                        // 时间格式转换为秒
-                        cuttingFront = (cuttingFront.split(':')[0] * 60 + parseFloat(cuttingFront.split(":")[1])).toFixed(1);
-                        // 判断时间值是否为NaN
-                        if (!isNaN(cuttingFront) && cuttingAfter) {
-                            songWordsList.push({
-                                songWords:cuttingAfter,
-                                time:cuttingFront,
-                                highlight:false,
-                            })
-                        }
-                    })
-                    _this.songWordsList = songWordsList;
-                    return request(`https://v1.itooi.cn/tencent/song?id=${id}`,false);
+                .then(res => {
+                    if(res.code == 200) {
+                        let songWordsList = new Array();
+                        let part = res.lrc.lyric.split("\n");
+                        part.forEach((item,index) => {
+                            // 拆分时间:歌词
+                            let start = item.indexOf('[');
+                            let end = item.indexOf(']');
+                            let len = item.length;
+                            let cuttingFront = item.substring(start + 1, end);
+                            let cuttingAfter = item.substring(end + 1, len);
+                            // 时间格式转换为秒
+                            cuttingFront = (cuttingFront.split(':')[0] * 60 + parseFloat(cuttingFront.split(":")[1])).toFixed(1);
+                            // 判断时间值是否为NaN
+                            if (!isNaN(cuttingFront) && cuttingAfter) {
+                                songWordsList.push({
+                                    songWords:cuttingAfter,
+                                    time:cuttingFront,
+                                    highlight:false,
+                                })
+                            }
+                        })
+                        _this.songWordsList = songWordsList;
+                        return request(`http://localhost:3000/song/detail?ids=${id}`,false);
+                    }
                 })
-                // 获取音乐详情
-                .then(body => {
-                    if(body.code == 200) {
-                        let songName = body.data[0].name;
-                        let singerName = body.data[0].singer[0].name;
-                        let albumName = body.data[0].album.name;
+                // 获取音乐详情/封面
+                .then(res => {
+                    if(res.code == 200) {
+                        let songName = res.songs[0].name;
+                        let singerName = this.parseName(res.songs[0].ar);
+                        let albumName = res.songs[0].al.name;
                         let songId = id;
                         let cancel = false;
                         this.songInfo = {songName,singerName,albumName,songId,cancel};
+
+                        this.songWordsList.unshift({
+                            songWords:songName,
+                            time:0,
+                            highlight:false,
+                        })
+                        // 封面
+                        let cover = res.songs[0].al.picUrl;
+                        this.songCover = cover;
+                        return request(`http://localhost:3000/song/url?id=${id}`,false);                        
                     }
                 })
                 // 调用音频/封面/歌词top值
-                .then(() => {
-                    // 音频
-                    let audioPath = `https://v1.itooi.cn/tencent/url?id=${id}&quality=128`;
-                    audio.src = audioPath;
-                    // 封面
-                    let cover = `https://v1.itooi.cn/tencent/pic?id=${id}`;
-                    this.songCover = cover;
-                    // 歌词top值
-                    let line = document.querySelectorAll('.line');
-                    line.forEach((item,index) => {
-                        let top = item.offsetTop;
-                        this.songWordsList[index].top = top;
-                    })
-                    this.backups = JSON.stringify(this.songWordsList);
-
-                    this.queryLike();
+                .then(res => {
+                    if(res.code == 200) {
+                        // 音频
+                        let audioPath = res.data[0].url;
+                        audio.src = audioPath;
+                        // 歌词top值
+                        let line = document.querySelectorAll('.line');
+                        line.forEach((item,index) => {
+                            let top = item.offsetTop;
+                            this.songWordsList[index].top = top;
+                        })
+                        this.backups = JSON.stringify(this.songWordsList);
+                        this.queryLike();
+                    }
 
                 })
             
@@ -534,12 +554,18 @@ export default {
         // 歌曲收藏
         like() {
             let likeData = JSON.parse(localStorage.getItem('like'));
-            let index = likeData.findIndex(item => item.songId == this.songId);
-            if(index != -1) {
-                likeData.splice(index,1);
+            if(likeData) {
+                let index = likeData.findIndex(item => item.songId == this.songId);
+                if(index != -1) {
+                    likeData.splice(index,1);
+                }else{
+                    likeData.unshift(this.songInfo);
+                }
             }else{
-                likeData.unshift(this.songInfo);
+
+                likeData = [this.songInfo]
             }
+            
             localStorage.setItem('like',JSON.stringify(likeData));
             this.queryLike();
             Bus.$emit('requestLike',likeData);

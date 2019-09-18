@@ -51,22 +51,45 @@ export default {
             let searchList = this.searchList;
             Bus.$emit('requestPlayer',songId,searchList);
         },
+        // 数据请求
+        request(url, format = true) {
+            return fetch(url).then(res => format ? res.json() : res.text());
+        },
+        // 歌手名(多人)
+        parseName(singerList) {
+            let singerName = '';
+            for(let f=0;f<singerList.length;f++) {
+                let name = singerList[f].name + '/';
+                singerName += name;
+            }
+            singerName = singerName.substring(0,singerName.length-1);
+            return singerName;
+        },
+        songState(songId) {
+            let url = `http://localhost:3000/song/url?id=${songId}`;
+            let playerURL = '';
+            this.request(url)
+                .then(res => {
+                    playerURL = res.data[0].url;
+                })
+            
+
+        },
         // 搜索请求
         searchSong() {
             let value = this.inputContent;
             if(value.length > 0){
                 Bus.$emit('show','show');
-                fetch(`https://v1.itooi.cn/tencent/search?keyword=${value}&type=song&pageSize=600&page=0`)
-                    .then((res) => res.text())
-                    .then((body) => {
-                        let data = JSON.parse(body);
-                        if(data.code == 200){
-                            let allData = data.data.list.map((item,index) => {
+                let url = `http://localhost:3000/search?keywords=${value}`;
+                this.request(url)
+                    .then(res => {
+                        if(res.code == 200){
+                            let allData = res.result.songs.map((item,index) => {
                                 return {
-                                    songId: item.songmid,
-                                    songName: item.songname,
-                                    singerName: item.singer[0].name,
-                                    albumName: item.albumname
+                                    songId: item.id,
+                                    songName: item.name,
+                                    singerName: this.parseName(item.artists),
+                                    albumName: item.album.name
                                 }
                             })
                             this.searchList = allData;
@@ -112,6 +135,7 @@ export default {
     }
     .result-list li{
         margin-bottom:1rem;
+        list-style:none;
     }
     .result-list .songName{
         font-size:1rem;

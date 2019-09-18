@@ -16,7 +16,6 @@
         </div>
         <!-- 主内容 -->
         <router-view></router-view>
-        
     </div>
 </template>
 <script>

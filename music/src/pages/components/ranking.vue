@@ -11,14 +11,14 @@
         </div>
         <div class="songList">
             <ul>
-                <li v-for="(item,index) in rankingData" :key="index" @click="requestPlayer(index)">
+                <li v-for="(item,index) in rankingData" :key="index" @click="requestPlayer(item.songId)">
                     <span class="order">{{index + 1}}</span>
                     <div class="songInfo">
                         <span class="songName">{{item.songName}}</span>
                         <br/>
                         <span class="singer">{{item.singerName}}</span>
                     </div>
-                    <a :href="item.url" :download="'music'+item.time" class="iconfont download">&#xe71d;</a>
+                    <span class="iconfont download" @click="download(item.songId,item.time)">&#xe71d;</span>
                 </li>
             </ul>
         </div>
@@ -42,38 +42,69 @@ export default {
             rankingData:[],
             ascription:'',
             updateTime:'',
-            rankingInfo:[{id:4,rankingName:'流行指数榜'},{id:26,rankingName:'热歌榜'},{id:27,rankingName:'新歌榜'},{id:3,rankingName:'欧美榜'},{id:60,rankingName:'抖音排行榜'}]
+            downloadMusic:'',
+            rankingInfo:[{id:3,rankingName:'云音乐飙升榜'},{id:1,rankingName:'云音乐热歌榜'},{id:0,rankingName:'云音乐新歌榜'},{id:4,rankingName:'云音乐电音榜'},{id:5,rankingName:'UK排行榜周榜'}]
         }
     },
     methods:{
-        requestPlayer(index) {
-            let songId = this.rankingData[index].songId;
-            let rankingData = this.rankingData;
-            Bus.$emit('requestPlayer',songId,rankingData);
+        requestPlayer(songId) {
+            let url = `http://localhost:3000/song/url?id=${songId}`;
+            this.request(url)
+             .then(res => {
+                if(res.code == 200) {
+                    let playerURL = res.data[0].url;
+                    Bus.$emit('requestPlayer',songId,this.rankingData);
+                }
+             })
+        },
+        // 歌手名(多人)
+        parseName(singerList) {
+            let singerName = '';
+            for(let f=0;f<singerList.length;f++) {
+                let name = singerList[f].name + '/';
+                singerName += name;
+            }
+            singerName = singerName.substring(0,singerName.length-1);
+            return singerName;
+        },
+        download(songId,time) {
+            let url = `http://localhost:3000/song/url?id=${songId}`;
+            this.request(url)
+             .then(res => {
+                if(res.code == 200) {
+                    let playerURL = res.data[0].url;
+                    this.downloadMusic.href = playerURL;
+                    this.downloadMusic.down = 'music'+time;
+                    this.downloadMusic.click();
+                }
+             })
+        },
+        // 数据请求
+        request(url, format = true) {
+            return fetch(url).then(res => format ? res.json() : res.text());
         }
 
     },
     mounted() {
         // window.open('https://v1.itooi.cn/tencent/url?id=000wocYU11tSzS');
-
-    
-
+        let downloadMusic = document.createElement('a');
+        this.downloadMusic = downloadMusic;
         let rankingId = this.$route.query.rankingId;
         if(rankingId) {
-            fetch(`https://v1.itooi.cn/tencent/topList?id=${rankingId}&pageSize=100&page=0&format=1`)
-                .then((res) => res.text())
-                .then((body) => {
-                    let data = JSON.parse(body);
-                    if(data.code == 200) {
+            let url = `http://localhost:3000/top/list?idx=${rankingId}`;
+            this.request(url)
+                .then(res => {
+                    if(res.code == 200) {
                         // 列表数据
-                        let rankingData = data.data.map((item,index) => {
+                        let data = res.playlist.tracks;
+                        let rankingData = data.map(item => {
+                            let singerList = item.ar;
                             return {
                                 songId:item.id,
                                 songName:item.name,
-                                singerName:item.singer,
-                                pic:item.pic,
-                                time:item.time,
-                                url:item.url
+                                singerName:this.parseName(singerList),
+                                pic:item.al.picUrl,
+                                time:item.al.pic_str,
                             }
                         })
                         this.rankingData = rankingData;
@@ -81,7 +112,7 @@ export default {
                         let ascription = this.rankingInfo.filter(item => item.id == rankingId)
                         this.ascription = ascription[0].rankingName;
                         // 更新时间
-                        let getTime = data.timestamp;
+                        let getTime = res.playlist.trackNumberUpdateTime;
                         let date = new Date(getTime);
                         let year = date.getFullYear();
                         let month = date.getMonth()+1;

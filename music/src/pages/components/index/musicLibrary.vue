@@ -52,7 +52,7 @@ export default {
             hotList:[],
             rankingData:[],
             state:false,
-            rankingInfo:[{id:4,rankingName:'流行指数榜'},{id:26,rankingName:'热歌榜'},{id:27,rankingName:'新歌榜'},{id:3,rankingName:'欧美榜'},{id:60,rankingName:'抖音排行榜'}]
+            rankingInfo:[{id:3,rankingName:'云音乐飙升榜'},{id:1,rankingName:'云音乐热歌榜'},{id:0,rankingName:'云音乐新歌榜'},{id:4,rankingName:'云音乐电音榜'},{id:5,rankingName:'UK排行榜周榜'}]
         }
     },
     methods: {
@@ -68,7 +68,8 @@ export default {
         },
         // 进入榜单首页
         enterRanking(index) {
-            let rankingId = this.rankingData[index].id;
+            let rankingId = this.rankingInfo[index].id;
+            console.log(rankingId)
             this.$router.push({
                 name:'ranking',
                 query:{
@@ -78,14 +79,32 @@ export default {
         },
         // 各类榜单
         getRanking(id) {
-            fetch(`https://v1.itooi.cn/tencent/topList?id=${id}&pageSize=3&page=0&format=1`)
-                .then((res) => res.text())
-                .then((body) => {
-                    let data = JSON.parse(body);
-                    if(data.code == 200) {
+            fetch(`http://localhost:3000/top/list?idx=${id}`)
+                .then(res => res.json())
+                .then(res => {
+                    if(res.code == 200) {
+                        let data = res.playlist.tracks;
+                        data.length = 3;
+                        let ranking = [];
+                        for(let i=0;i<3;i++) {
+                            // 歌手名（多人）
+                            let singerList = data[i].ar;
+                            let name = data[i].name;
+                            let pic = data[i].al.picUrl;
+                            let singerName = '';
+                            for(let f=0;f<singerList.length;f++) {
+                                let name = singerList[f].name + '/';
+                                singerName += name;
+                            }
+                            singerName = singerName.substring(0,singerName.length-1);
+                            ranking.push({
+                                singer: singerName,
+                                name,
+                                pic
+                            });
+                        }
                         this.rankingData.push({
-                            id,
-                            data:data['data']
+                            data:ranking
                         })
                     }
                 })
@@ -100,7 +119,6 @@ export default {
     
     mounted() {
         Bus.$emit('page','musicLibrary');
-
         // 调用各类榜单函数
         this.rankingInfo.forEach((item,index) => {
             let rankingID = item.id;
@@ -108,20 +126,19 @@ export default {
         })
 
         // 歌单
-        fetch('https://v1.itooi.cn/tencent/songList/hot?cat=all&pageSize=100&page=0')
+        fetch('http://localhost:3000/personalized?limit=6')
             .then((res) => res.text())
             .then((body) => {
                 let data = JSON.parse(body);
                 if(data.code == 200){
-                    let len = 6;
-                    let list = data.data.list;
+                    let list = data.result;
                     let hotList = Array();
-                    for(let i=0; i<len; i++){
+                    for(let i=0; i<list.length; i++){
                         let item = list[i];
                         hotList.push({
-                            pic:item.imgurl,
-                            dissName:item.dissname,
-                            dissId:item.dissid
+                            pic:item.picUrl,
+                            dissName:item.name,
+                            dissId:item.id
                         })
                     }
                     this.hotList = hotList;

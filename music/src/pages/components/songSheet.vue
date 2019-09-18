@@ -50,25 +50,42 @@ export default {
             let songId = this.songSheetInfo.allSongList[index].songId;
             let songList = this.songSheetInfo.allSongList;
             Bus.$emit('requestPlayer',songId,songList);
+        },
+        // 数据请求
+        request(url, format = true) {
+            return fetch(url).then(res => format ? res.json() : res.text());
+        },
+        // 歌手名(多人)
+        parseName(singerList) {
+            let singerName = '';
+            for(let f=0;f<singerList.length;f++) {
+                let name = singerList[f].name + '/';
+                singerName += name;
+            }
+            singerName = singerName.substring(0,singerName.length-1);
+            return singerName;
         }
     },
     mounted(){
+        // 歌单ID
         let dissId = this.$route.query.dissId;
-        if(dissId){
-            fetch(`https://v1.itooi.cn/tencent/songList?id=${dissId}&pageSize=100&page=0`)
-                .then((res) => res.text())
-                .then((body) => {
-                    let data = JSON.parse(body);
-                    if(data.code == 200){
-                        let title = data.data[0].dissname;
-                        let pic = data.data[0].logo;
-                        let desc = data.data[0].desc.replace(/\<br>/g,"\n").replace(/\&#160/g,"");
-                        let songList = data.data[0].songlist;
-                        let allSongList = songList.map((item,index) => {
+        if(dissId) {
+            // 获取歌单详情
+            let url = `http://localhost:3000/playlist/detail?id=${dissId}`;
+            this.request(url)
+                .then(res => {
+                    if(res.code == 200){
+                        let title = res.playlist.name;
+                        let pic = res.playlist.coverImgUrl;
+                        let desc = res.playlist.description;
+                        let songListID = res.playlist.trackIds;
+                        let songListInfo = res.playlist.tracks;
+                        
+                        let allSongList = songListInfo.map((item,index) => {
                             return {
-                                songName: item.title,
-                                singerName: item.singer[0].title,
-                                songId: item.mid
+                                songName: item.name,
+                                singerName: this.parseName(item.ar),
+                                songId: songListID[index]['id']
                             }
                         })
                         this.songSheetInfo = {title,pic,desc,allSongList};
