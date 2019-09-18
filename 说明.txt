@@ -1,2 +1,8 @@
-1.确保music 和 NeteaseCloudMusicApi 文件夹目录都已经安装了node_modules的情况下
-2.进入NeteaseCloudMusicApi文件夹目录下    终端执行node app.js 开启服务
+1.
+确保music 和 NeteaseCloudMusicApi 文件夹目录都已经安装了node_modules的情况下
+
+2.
+进入NeteaseCloudMusicApi文件夹目录下    终端执行node app.js 开启服务
+
+API网站：
+https://binaryify.github.io/NeteaseCloudMusicApi/#/
