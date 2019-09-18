@@ -4,5 +4,5 @@
 2.
 进入NeteaseCloudMusicApi文件夹目录下    终端执行node app.js 开启服务
 
-API网站：
+API网址：
 https://binaryify.github.io/NeteaseCloudMusicApi/#/
